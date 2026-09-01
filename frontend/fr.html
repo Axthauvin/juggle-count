@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Compteur de Jongles — Vision IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <header>
+        <h1>Compteur de Jongles</h1>
+        <p class="subtitle">
+          Comptage automatique de jongles de football à partir d'une vidéo avec
+          YOLOv8.
+        </p>
+
+        <div class="meta-bar">
+          <div class="meta-pill">
+            <span class="device-dot" id="device-dot"></span>
+            <span id="device-status-text">Vérification du matériel...</span>
+            <div class="switch-wrapper">
+              <span class="switch-label">GPU</span>
+              <label
+                class="switch"
+                title="Activer/Désactiver l'accélération GPU"
+              >
+                <input
+                  type="checkbox"
+                  id="gpu-toggle"
+                  onchange="onGpuToggleChanged(event)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="meta-pill">
+            <span>YOLOv8 Pose &amp; Détection</span>
+          </div>
+          <div class="lang-switch" role="group" aria-label="Choisir la langue">
+            <a href="index.html" class="lang-btn"
+              ><span class="flag">🇬🇧</span> EN</a
+            >
+            <a href="fr.html" class="lang-btn active" aria-current="page"
+              ><span class="flag">🇫🇷</span> FR</a
+            >
+          </div>
+        </div>
+      </header>
+
+      <main class="main-card">
+        <!-- Upload view (dropzone + samples) -->
+        <div class="upload-view" id="upload-view">
+          <div
+            class="dropzone"
+            id="dropzone"
+            onclick="document.getElementById('video-input').click()"
+          >
+            <div class="dropzone-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.75"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+            </div>
+            <h3>Glissez votre vidéo ici ou parcourez vos fichiers</h3>
+            <p>Formats supportés : MP4, MOV, WEBM, AVI (max 100 Mo)</p>
+            <input
+              type="file"
+              id="video-input"
+              class="file-input"
+              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+              onchange="handleFileSelected(event)"
+            />
+          </div>
+
+          <div class="samples-container">
+            <span class="samples-label"
+              >Ou tester avec une vidéo d'exemple :</span
+            >
+            <div class="sample-cards-grid">
+              <button
+                type="button"
+                class="sample-card"
+                onclick="
+                  loadSampleVideo('/assets/ibra-beach.mp4', 'ibra-beach.mp4')
+                "
+              >
+                <div class="sample-thumb-wrapper">
+                  <img
+                    src="/assets/ibra-beach-thumb.jpg"
+                    alt="Ibrahimović Plage"
+                    class="sample-thumb"
+                    loading="lazy"
+                  />
+                  <div class="sample-play-overlay">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <div class="sample-meta">
+                  <span class="sample-title">Ibrahimović</span>
+                  <span class="sample-tag">Plage</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="sample-card"
+                onclick="
+                  loadSampleVideo('/assets/ney-barca.mp4', 'ney-barca.mp4')
+                "
+              >
+                <div class="sample-thumb-wrapper">
+                  <img
+                    src="/assets/ney-barca-thumb.jpg"
+                    alt="Neymar Barça"
+                    class="sample-thumb"
+                    loading="lazy"
+                  />
+                  <div class="sample-play-overlay">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <div class="sample-meta">
+                  <span class="sample-title">Neymar</span>
+                  <span class="sample-tag">Barça</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div class="loading-state" id="loading-state">
+          <div class="spinner"></div>
+          <h3>Traitement de la vidéo...</h3>
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div class="progress-info">
+            <span id="loading-engine-text">Suivi de la pose et du ballon</span>
+            <span id="progress-percent">0%</span>
+          </div>
+        </div>
+
+        <!-- Result section -->
+        <div class="result-section" id="result-section">
+          <div class="result-video-wrapper">
+            <video id="annotated-video" controls playsinline></video>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Total Jongles</div>
+              <div class="stat-value" id="res-juggle-count">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Durée</div>
+              <div class="stat-value" id="res-duration">0s</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Images</div>
+              <div class="stat-value" id="res-frames">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Compteur direct</div>
+              <div class="stat-value" id="res-live-count">0</div>
+            </div>
+          </div>
+
+          <div class="actions-bar">
+            <button class="btn btn-secondary" onclick="resetUpload()">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              Nouvelle vidéo
+            </button>
+            <a class="btn" id="download-btn" download="annotated_video.mp4">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Télécharger la vidéo
+            </a>
+          </div>
+        </div>
+      </main>
+
+      <div class="explanations">
+        <h3>Comment ça marche</h3>
+        <p>
+          Cette application traite des vidéos avec YOLOv8 pour détecter et
+          suivre les mouvements d'un ballon de football ainsi que les mouvements
+          du joueur, afin de compter automatiquement le nombre de jongles
+          effectués.
+        </p>
+
+        <p>
+          Le modèle n'est <strong>pas fine-tuné</strong> spécifiquement pour cet
+          usage, et utilise le label pré-entraîné du dataset COCO
+          <a
+            href="https://gist.github.com/rcland12/dc48e1963268ff98c8b2c4543e7a9be8"
+            >"sports ball"</a
+          >
+          (ID 32) pour détecter le ballon, et
+          <a href="https://docs.ultralytics.com/tasks/pose">YOLOv8-Pose</a>
+          pour identifier les articulations / mouvements du joueur.
+        </p>
+
+        <p>
+          Pour détecter et compter les jongles, j'ai mis en place un algorithme
+          qui repose sur un fonctionnement très simple :
+        </p>
+        <ul>
+          <li>
+            Détection du ballon et des articulations du corps à chaque image
+            avec suivi spatial.
+          </li>
+          <li>
+            Suivi de la trajectoire du ballon :
+            <strong>Falling</strong> (descente) ou
+            <strong>Rising</strong> (montée).
+          </li>
+          <li>
+            Lors d'une inversion de trajectoire (passage de
+            <strong>Falling</strong> à <strong>Rising</strong>), le compteur
+            s'incrémente si le ballon se trouve à proximité d'une articulation
+            du corps (pieds, genoux, tête).
+          </li>
+        </ul>
+
+        <p>
+          Cet algorithme est assez basique, et contient plusieurs limites, tel
+          que la balle qui sort du cadre de la vidéo, ou les mouvements rapides
+          du joueur qui peuvent échapper à la détection.
+        </p>
+
+        <p>
+          L'accélération GPU (CUDA) est supportée pour accélérer l'inférence sur
+          matériel NVIDIA compatible.
+        </p>
+      </div>
+
+      <footer>
+        <p>Compteur de Jongles &bull; Vision IA YOLOv8</p>
+        <p>
+          Créé par <a href="https://axthauvin.fr">Axel Thauvin</a> -
+          <a href="https://github.com/axthauvin">GitHub</a>
+        </p>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

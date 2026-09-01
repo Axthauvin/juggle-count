@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Juggle Counter — AI Vision</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-wrapper">
+      <header>
+        <h1>Juggle Counter</h1>
+        <p class="subtitle">
+          Count football juggles automatically from video using YOLOv8.
+        </p>
+
+        <div class="meta-bar">
+          <div class="meta-pill">
+            <span class="device-dot" id="device-dot"></span>
+            <span id="device-status-text">Checking hardware...</span>
+            <div class="switch-wrapper">
+              <span class="switch-label">GPU</span>
+              <label class="switch" title="Enable/Disable GPU acceleration">
+                <input
+                  type="checkbox"
+                  id="gpu-toggle"
+                  onchange="onGpuToggleChanged(event)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="meta-pill">
+            <span>YOLOv8 Pose &amp; Detection</span>
+          </div>
+          <div class="lang-switch" role="group" aria-label="Language selector">
+            <a href="index.html" class="lang-btn active" aria-current="page"
+              ><span class="flag">🇬🇧</span> EN</a
+            >
+            <a href="fr.html" class="lang-btn"
+              ><span class="flag">🇫🇷</span> FR</a
+            >
+          </div>
+        </div>
+      </header>
+
+      <main class="main-card">
+        <!-- Upload view (dropzone + samples) -->
+        <div class="upload-view" id="upload-view">
+          <div
+            class="dropzone"
+            id="dropzone"
+            onclick="document.getElementById('video-input').click()"
+          >
+            <div class="dropzone-icon">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.75"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+            </div>
+            <h3>Drop your video here or browse files</h3>
+            <p>Supported formats: MP4, MOV, WEBM, AVI (max 100MB)</p>
+            <input
+              type="file"
+              id="video-input"
+              class="file-input"
+              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+              onchange="handleFileSelected(event)"
+            />
+          </div>
+
+          <div class="samples-container">
+            <span class="samples-label">Or try a sample video:</span>
+            <div class="sample-cards-grid">
+              <button
+                type="button"
+                class="sample-card"
+                onclick="
+                  loadSampleVideo('/assets/ibra-beach.mp4', 'ibra-beach.mp4')
+                "
+              >
+                <div class="sample-thumb-wrapper">
+                  <img
+                    src="/assets/ibra-beach-thumb.jpg"
+                    alt="Ibrahimović Beach"
+                    class="sample-thumb"
+                    loading="lazy"
+                  />
+                  <div class="sample-play-overlay">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <div class="sample-meta">
+                  <span class="sample-title">Ibrahimović</span>
+                  <span class="sample-tag">Beach</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                class="sample-card"
+                onclick="
+                  loadSampleVideo('/assets/ney-barca.mp4', 'ney-barca.mp4')
+                "
+              >
+                <div class="sample-thumb-wrapper">
+                  <img
+                    src="/assets/ney-barca-thumb.jpg"
+                    alt="Neymar Barça"
+                    class="sample-thumb"
+                    loading="lazy"
+                  />
+                  <div class="sample-play-overlay">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+                <div class="sample-meta">
+                  <span class="sample-title">Neymar</span>
+                  <span class="sample-tag">Barça</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div class="loading-state" id="loading-state">
+          <div class="spinner"></div>
+          <h3>Processing video...</h3>
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div class="progress-info">
+            <span id="loading-engine-text">Tracking pose and ball motion</span>
+            <span id="progress-percent">0%</span>
+          </div>
+        </div>
+
+        <!-- Result section -->
+        <div class="result-section" id="result-section">
+          <div class="result-video-wrapper">
+            <video id="annotated-video" controls playsinline></video>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Total Juggles</div>
+              <div class="stat-value" id="res-juggle-count">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Duration</div>
+              <div class="stat-value" id="res-duration">0s</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Frames</div>
+              <div class="stat-value" id="res-frames">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Live Count</div>
+              <div class="stat-value" id="res-live-count">0</div>
+            </div>
+          </div>
+
+          <div class="actions-bar">
+            <button class="btn btn-secondary" onclick="resetUpload()">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              New video
+            </button>
+            <a class="btn" id="download-btn" download="annotated_video.mp4">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
+              </svg>
+              Download video
+            </a>
+          </div>
+        </div>
+      </main>
+
+      <div class="explanations">
+        <h3>How it works</h3>
+        <p>
+          This is a video processing application that uses YOLOv8 to detect and
+          track the motion of a juggling ball alongside player body pose.
+        </p>
+
+        <p>
+          The detector is <strong>not fine-tuned</strong> for this specific use.
+          It relies on the pre-trained COCO
+          <a
+            href="https://gist.github.com/rcland12/dc48e1963268ff98c8b2c4543e7a9be8"
+            >"sports ball"</a
+          >
+          label (ID 32) for ball detection, and
+          <a href="https://docs.ultralytics.com/tasks/pose">YOLOv8-Pose</a>
+          to detect the player's body joints.
+        </p>
+
+        <p>
+          To detect and count juggles, the algorithm uses a lightweight
+          trajectory heuristic:
+        </p>
+        <ul>
+          <li>
+            Detect the ball and player joints in each frame with spatial
+            tracking.
+          </li>
+          <li>
+            Track whether the ball is <strong>Falling</strong> or
+            <strong>Rising</strong>.
+          </li>
+          <li>
+            On trajectory reversal (from <strong>Falling</strong> to
+            <strong>Rising</strong>), increment the count if the ball is within
+            proximity of the player's body joints (feet, knees, head).
+          </li>
+        </ul>
+
+        <p>
+          This algorithm is quite basic and has several limitations, such as the
+          ball going out of the video frame or the player's fast movements that
+          may be missed by the detection.
+        </p>
+
+        <p>
+          GPU acceleration (CUDA) is supported to speed up inference on
+          compatible NVIDIA hardware.
+        </p>
+      </div>
+
+      <footer>
+        <p>Juggle Counter &bull; YOLOv8 AI Vision</p>
+        <p>
+          Made by <a href="https://axthauvin.fr">Axel Thauvin</a> -
+          <a href="https://github.com/axthauvin">GitHub</a>
+        </p>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
