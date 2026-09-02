@@ -2,7 +2,7 @@
 
 # Juggle Count
 
-![Demo](assets/annotated-ney.gif)
+<img src="assets/icon.png" alt="Icon" width="100" height="100">
 
 A small computer vision side project experimenting with YOLOv8 to automatically track and count football juggles from uploaded videos.
 
@@ -12,6 +12,8 @@ A small computer vision side project experimenting with YOLOv8 to automatically 
     <a href="#development">Development</a>
   </p>
 </div>
+
+![Demo](assets/annotated-ney.gif)
 
 ---
 
